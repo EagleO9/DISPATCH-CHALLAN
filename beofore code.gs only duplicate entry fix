@@ -1,0 +1,1082 @@
+/************************************************************
+ * Code.gs — PERFORMANCE OPTIMIZED VERSION (Updated)
+ *
+ * PDF GENERATION RULES (do NOT change):
+ *  1) submitFormAndCreatePDF  -> Builds the PDF ONLY from the current
+ *                                submission. Nothing is read from INWARD.
+ *  2) createChallanPDF        -> Builds the PDF from INWARD, using ALL
+ *                                rows of that dispatchId. Full reprint.
+ *
+ * NEW IN THIS UPDATE:
+ *  - Transport Name is NOT printed on the PDF (but it is still saved to
+ *    INWARD column 21 — the save/store logic stays intact).
+ *  - PCS Per Bora / PCS Per Bale are read from the Master sheet and an
+ *    "Avg/pc" (average weight per piece) is shown on the weight side of
+ *    each item block. Bora type -> PCS Per Bora, Bale type -> PCS Per Bale.
+ *    (Box has no PCS column in Master, so Avg/pc is skipped for Box.)
+ *  - PDF layout: Dispatch/Contractor on the LEFT (item side); Total Weight
+ *    + Avg/pc + Count on the RIGHT (weight side).
+ *  - Grand total: Bora, Bale and Box are counted separately.
+ *  - searchChallanIds() powers the reprint search.
+ *
+ * All original logic (cache, lock, batch writes, duplicate prevention)
+ * is 100% preserved.
+ ************************************************************/
+
+function doGet(e) {
+  return HtmlService.createHtmlOutputFromFile("form");
+}
+
+/* ===========================
+    CACHE HELPERS
+=========================== */
+const CACHE_TTL = 300; // 5 minutes
+const CACHE_KEY_ITEMS = "v1_items_list";
+const CACHE_KEY_ORDERS = "v1_orders_list";
+const CACHE_KEY_CHALLANS = "v1_challans_list";
+const CACHE_KEY_MASTER_PCS = "v1_master_pcs_map"; // NEW
+
+function _getCache_() {
+  return CacheService.getScriptCache();
+}
+
+function _invalidateListCaches_() {
+  try {
+    const c = _getCache_();
+    c.removeAll([CACHE_KEY_ITEMS, CACHE_KEY_ORDERS, CACHE_KEY_CHALLANS]);
+  } catch (e) { /* non-fatal */ }
+}
+
+/* ===========================
+    FORMATTERS
+=========================== */
+function formatPDFDate_(d){
+  try{
+    const dt = new Date(d);
+    const opts = { day: "numeric", month: "short", year: "numeric" };
+    return dt.toLocaleDateString("en-GB", opts).replace(",", "");
+  }catch(e){ return d; }
+}
+
+function formatPDFTime_(v){
+  try{
+    if (!v) return v;
+    if (Object.prototype.toString.call(v) === "[object Date]") {
+      return Utilities.formatDate(v, "Asia/Kolkata", "HH:mm:ss");
+    }
+    const m = String(v).match(/(\d{2}:\d{2}:\d{2})/);
+    return m ? m[1] : v;
+  }catch(e){ return v; }
+}
+
+function fmt2(v){
+  const n = Number(v);
+  return isNaN(n) ? "0.00" : n.toFixed(2);
+}
+
+/* ===========================
+    MASTER PCS MAP (NEW — CACHED)
+    Master sheet:
+      Col A = Item Name
+      Col B = PCS Per Bora
+      Col C = PCS Per Bale
+    Returns { lowercaseItemName: { bora: n, bale: n } }
+=========================== */
+function getMasterPcsMap_() {
+  const cache = _getCache_();
+  const cached = cache.get(CACHE_KEY_MASTER_PCS);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  const map = Object.create(null);
+  const sh = SpreadsheetApp.getActive().getSheetByName("Master");
+  if (!sh) return map;
+  const last = sh.getLastRow();
+  if (last < 2) return map;
+
+  // A=Item, B=PCS Per Bora, C=PCS Per Bale
+  const vals = sh.getRange(2, 1, last - 1, 3).getValues();
+  for (let i = 0; i < vals.length; i++) {
+    const name = String(vals[i][0] || "").trim().toLowerCase();
+    if (!name) continue;
+    if (!(name in map)) {
+      map[name] = {
+        bora: Number(vals[i][1]) || 0,
+        bale: Number(vals[i][2]) || 0
+      };
+    }
+  }
+
+  try { cache.put(CACHE_KEY_MASTER_PCS, JSON.stringify(map), CACHE_TTL); } catch(e) {}
+  return map;
+}
+
+// Returns the correct pcs-per-unit based on the packing type
+function _pcsPerUnitFor_(pcsMap, itemName, packingType) {
+  const key = String(itemName || "").trim().toLowerCase();
+  const info = pcsMap[key];
+  if (!info) return 0;
+  return (String(packingType || "Bora").toLowerCase() === "bale") ? (info.bale || 0) : (info.bora || 0);
+}
+
+/* ===========================
+    DROPDOWN LIST LOADERS (CACHED)
+=========================== */
+function getItemList() {
+  const cache = _getCache_();
+  const cached = cache.get(CACHE_KEY_ITEMS);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  const sh = SpreadsheetApp.getActive().getSheetByName("Master");
+  if (!sh) return [];
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+
+  const values = sh.getRange(2, 1, last - 1, 1).getValues();
+  const seen = new Set();
+  const result = [];
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i][0];
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      result.push(v);
+    }
+  }
+
+  try { cache.put(CACHE_KEY_ITEMS, JSON.stringify(result), CACHE_TTL); } catch(e) {}
+  return result;
+}
+
+function getChallanList(limit) {
+  const cache = _getCache_();
+  const cacheKey = CACHE_KEY_CHALLANS + "_" + (limit || "all");
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  const sh = SpreadsheetApp.getActive().getSheetByName("INWARD");
+  if (!sh) return [];
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+
+  const vals = sh.getRange(2, 6, last - 1, 1).getValues();
+  const out = [];
+  const seen = new Set();
+  for (let i = vals.length - 1; i >= 0; i--) {
+    const v = String(vals[i][0]).trim();
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+      if (limit && out.length >= limit) break;
+    }
+  }
+
+  try { cache.put(cacheKey, JSON.stringify(out), CACHE_TTL); } catch(e) {}
+  return out;
+}
+
+/* ===========================
+    SEARCH CHALLAN IDS (server-side fallback search)
+=========================== */
+function searchChallanIds(query) {
+  if (!query) return [];
+  const q = String(query).toLowerCase().trim();
+  if (!q) return [];
+
+  const sh = SpreadsheetApp.getActive().getSheetByName("INWARD");
+  if (!sh) return [];
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+
+  const vals = sh.getRange(2, 6, last - 1, 1).getValues();
+  const out = [];
+  const seen = new Set();
+  // newest first
+  for (let i = vals.length - 1; i >= 0; i--) {
+    const v = String(vals[i][0]).trim();
+    if (v && !seen.has(v) && v.toLowerCase().indexOf(q) !== -1) {
+      seen.add(v);
+      out.push(v);
+      if (out.length >= 25) break;
+    }
+  }
+  return out;
+}
+
+function searchPackingIds(query) {
+  if (!query) return [];
+  const q = String(query).toLowerCase().trim();
+  if (!q) return [];
+
+  const sh = SpreadsheetApp.getActive().getSheetByName("INWARD");
+  if (!sh) return [];
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const lastCol = sh.getLastColumn();
+  if (lastCol < 22) return [];
+
+  const vals = sh.getRange(2, 22, last - 1, 1).getValues();
+  const out = [];
+  const seen = new Set();
+  for (let i = vals.length - 1; i >= 0; i--) {
+    const v = String(vals[i][0] || "").trim();
+    if (v && !seen.has(v) && v.toLowerCase().indexOf(q) !== -1) {
+      seen.add(v);
+      out.push(v);
+      if (out.length >= 25) break;
+    }
+  }
+  return out;
+}
+
+function getPackingList(limit) {
+  const sh = SpreadsheetApp.getActive().getSheetByName("INWARD");
+  if (!sh) return [];
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const lastCol = sh.getLastColumn();
+  if (lastCol < 22) return [];
+
+  const vals = sh.getRange(2, 22, last - 1, 1).getValues();
+  const out = [];
+  const seen = new Set();
+  for (let i = vals.length - 1; i >= 0; i--) {
+    const v = String(vals[i][0] || "").trim();
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      out.push(v);
+      if (limit && out.length >= limit) break;
+    }
+  }
+  return out;
+}
+
+function getOrderList() {
+  const cache = _getCache_();
+  const cached = cache.get(CACHE_KEY_ORDERS);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  const sh = SpreadsheetApp.getActive().getSheetByName("Order");
+  if (!sh) return [];
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+
+  const vals = sh.getRange(2, 1, last - 1, 1).getValues();
+  const seen = new Set();
+  const result = [];
+  for (let i = 0; i < vals.length; i++) {
+    const v = vals[i][0];
+    if (v && !seen.has(v)) {
+      seen.add(v);
+      result.push(v);
+    }
+  }
+
+  try { cache.put(CACHE_KEY_ORDERS, JSON.stringify(result), CACHE_TTL); } catch(e) {}
+  return result;
+}
+
+/* ===========================
+    getOrderDetails (PENDING QTY CALC)
+=========================== */
+function getOrderDetails(orderId) {
+  const ss = SpreadsheetApp.getActive();
+  const orderSh = ss.getSheetByName("Order");
+  const inwardSh = ss.getSheetByName("INWARD");
+
+  if (!orderSh) return { found: false };
+
+  const lastOrderRow = orderSh.getLastRow();
+  if (lastOrderRow < 2) return { found: false };
+
+  const orderIdTrim = String(orderId).trim();
+  const packedCounts = Object.create(null);
+
+  if (inwardSh) {
+    const lastInwardRow = inwardSh.getLastRow();
+    if (lastInwardRow >= 2) {
+      const inwardData = inwardSh.getRange(2, 3, lastInwardRow - 1, 4).getValues();
+      const len = inwardData.length;
+      for (let i = 0; i < len; i++) {
+        const row = inwardData[i];
+        const dId = String(row[3] || "").trim();
+        if (dId === orderIdTrim) {
+          const itemName = String(row[0] || "").trim().toLowerCase();
+          const itemDescription = String(row[1] || "").trim().toLowerCase();
+          const key = itemName + "|" + itemDescription;
+          packedCounts[key] = (packedCounts[key] || 0) + 1;
+        }
+      }
+    }
+  }
+
+  const data = orderSh.getRange(2, 1, lastOrderRow - 1, 8).getValues();
+
+  const payload = {
+    found: false,
+    alreadySubmitted: false,
+    date: "",
+    customerName: "",
+    shipTo: "",
+    items: []
+  };
+
+  let orderIdExists = false;
+  const dataLen = data.length;
+
+  for (let i = 0; i < dataLen; i++) {
+    const row = data[i];
+    if (String(row[0]).trim() !== orderIdTrim) continue;
+
+    orderIdExists = true;
+    payload.found = true;
+
+    if (!payload.date) {
+      let d = row[1];
+      try {
+        if (d instanceof Date) { d = d.toISOString().split('T')[0]; }
+      } catch(e) { d = row[1]; }
+
+      payload.date = d;
+      payload.customerName = row[2];
+      payload.shipTo = row[3];
+    }
+
+    const itemNameOrig = String(row[4] || "").trim();
+    const itemDescOrig = String(row[5] || "").trim();
+
+    if(itemNameOrig) {
+      const totalQty = Number(row[6]) || 0;
+      const matchKey = itemNameOrig.toLowerCase() + "|" + itemDescOrig.toLowerCase();
+
+      const currentPacked = packedCounts[matchKey] || 0;
+      const deduction = Math.min(totalQty, currentPacked);
+      const pendingQty = totalQty - deduction;
+
+      packedCounts[matchKey] = currentPacked - deduction;
+
+      if (pendingQty > 0) {
+        payload.items.push({
+          itemName: itemNameOrig,
+          itemDescription: itemDescOrig,
+          totalQty: totalQty,
+          pendingQty: pendingQty,
+          type: row[7] || "Bora"
+        });
+      }
+    }
+  }
+
+  payload.alreadySubmitted = (orderIdExists && payload.items.length === 0);
+  return payload;
+}
+
+/* ===========================
+    DISPATCH ID GENERATOR
+=========================== */
+function getLastDispatchSeq_(sheet) {
+  const last = sheet.getLastRow();
+  if (last < 2) return 0;
+  const col = sheet.getRange(2, 6, last - 1, 1).getValues();
+  for (let i = col.length - 1; i >= 0; i--) {
+    const m = String(col[i][0]).match(/(\d+)$/);
+    if (m) return Number(m[1]);
+  }
+  return 0;
+}
+
+function fmtDispatchId_(prefix, num) {
+  return prefix + String(num).padStart(4, "0");
+}
+
+/* ===========================
+    PACKING ID GENERATOR (NEW)
+    PCK-XXXX stored in INWARD column 22
+=========================== */
+function getLastPackingSeq_(sheet) {
+  const last = sheet.getLastRow();
+  if (last < 2) return 0;
+  // Read column 22 (Packing ID) only if there are enough columns
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 22) return 0;
+  const col = sheet.getRange(2, 22, last - 1, 1).getValues();
+  let maxN = 0;
+  for (let i = 0; i < col.length; i++) {
+    const m = String(col[i][0] || "").match(/^PCK-(\d+)$/);
+    if (m) { const n = Number(m[1]); if (n > maxN) maxN = n; }
+  }
+  return maxN;
+}
+
+function fmtPackingId_(num) {
+  return "PCK-" + String(num).padStart(4, "0");
+}
+
+
+/* ===========================
+    PDF HTML BUILDER (shared by both flows)
+    LAYOUT:
+      - Transport is NOT printed on the PDF (only saved to the sheet).
+      - Item block subtotal:
+          Dispatch / Contractor -> LEFT  (item-name side, top)
+          Bora/Bale/Box count   -> LEFT  (item-name side, below)
+          Total Weight          -> RIGHT (weight side, top)
+          Avg/pc                -> RIGHT (weight side, below) [from Master pcs]
+      - Grand total: Bora, Bale and Box counted separately (smart display).
+=========================== */
+function _getChallanHTML_(payload) {
+  const {
+    dispatchId, packingId, date, customerName, shipTo,
+    driverName, vehicleNumber, driverNumber,
+    loaderName, transportName, pdfGenTime,
+    items, grandTotalBora, grandTotalBale, grandTotalBox, grandTotalWeight
+  } = payload;
+
+  const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+  const itemRows = items.map(it => {
+    let total = (it.weights || []).reduce((a,b)=>a+(+b||0),0);
+    let count = (it.weights || []).length;
+    let packLabel = it.packingType || "Bora";
+    let sr = 1;
+
+    // ===== Average weight per piece (from Master pcs) =====
+    const pcsPerUnit = Number(it.pcsPerUnit) || 0;
+    const totalPcs = count * pcsPerUnit;
+    const avgPerPcs = totalPcs > 0 ? (total / totalPcs) : 0;
+
+    const rows = (it.weights || []).map(w => {
+      let fullDisplayName = esc(it.itemName);
+      if (it.itemDescription) {
+          fullDisplayName += " " + esc(it.itemDescription);
+      }
+
+      return `
+      <div class="row item-row">
+        <div class="left">
+          ${sr++}. ${fullDisplayName}
+        </div>
+        <div class="right">${fmt2(w)} kg</div>
+      </div>`;
+    }).join("");
+
+    // ===== LAYOUT (stacked) =====
+    // LEFT  (item side):   Dispatch/Contractor name -> top
+    //                      Bora/Bale/Box count      -> below
+    // RIGHT (weight side): Total Weight             -> top
+    //                      Avg/pc                   -> below (from Master pcs)
+    const hasContr = it.contractorName && String(it.contractorName).trim() !== "";
+    const contrLine = hasContr
+      ? `<b>Dispatch:</b> ${esc(it.contractorName)}`
+      : `&nbsp;`;
+    const countLine = `<b>${esc(packLabel)}: ${count}</b>`;
+
+    const totalWtLine = `<b>Total Weight: ${fmt2(total)} kg</b>`;
+    const avgLine = totalPcs > 0
+      ? `<b>Avg/pc: ${fmt2(avgPerPcs)} kg</b> <span class="pcs-note">(${totalPcs} pcs)</span>`
+      : "";
+
+    return `
+      <div class="item-block">
+        ${rows}
+        <div class="subtotal">
+          <span class="contr-side">
+            <div>${countLine}</div>
+            <div>${contrLine}</div>
+          </span>
+          <span class="weight-side">
+            <div>${totalWtLine}</div>
+            ${avgLine ? `<div>${avgLine}</div>` : ""}
+          </span>
+        </div>
+      </div>`;
+  }).join("");
+
+  // Grand total units: show only the types that are present (> 0)
+  const gBora = Number(grandTotalBora) || 0;
+  const gBale = Number(grandTotalBale) || 0;
+  const gBox  = Number(grandTotalBox)  || 0;
+  const unitParts = [];
+  if (gBora > 0) unitParts.push(`Total Bora: ${gBora}`);
+  if (gBale > 0) unitParts.push(`Total Bale: ${gBale}`);
+  if (gBox  > 0) unitParts.push(`Total Box: ${gBox}`);
+  if (unitParts.length === 0) unitParts.push(`Total Bora: 0`);
+  const unitsHtml = `<div>${unitParts.join(" &nbsp;&nbsp;|&nbsp;&nbsp; ")}</div>`;
+
+  // ---- Build a clean Packing IDs display string for the header (NEW) ----
+  let pkDisplay = "";
+  let pkLabel = "Packing ID";
+  try {
+    const _raw = String(packingId || "").trim();
+    if (_raw) {
+      const _ids = _raw.split(",").map(function(s){return s.trim();}).filter(Boolean);
+      if (_ids.length === 1) {
+        pkDisplay = _ids[0];
+      } else {
+        pkDisplay = _ids.join(", ");
+        pkLabel = "Packing IDs";
+      }
+    }
+  } catch (e) { pkDisplay = String(packingId || ""); }
+
+  return `
+  <html><head>
+  <style>
+    body{font-family:Arial;font-size:13px;}
+    h2{text-align:center;font-size:24px;margin:0 0 10px 0;}
+    .hdr{border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px;}
+    .meta{font-size:13px;margin:2px 0;}
+    .row{display:flex;justify-content:space-between;}
+    .item-row{font-size:12px;padding:1px 0;}
+    .item-block{border-bottom:1px dashed #888;padding:6px 0;margin-bottom:4px;}
+    .subtotal{
+      font-size:12px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      margin-top:4px;
+      background:#f5f5f5;
+      padding:5px 8px;
+      border-radius:4px;
+    }
+    .contr-side{text-align:left;line-height:1.6;}
+    .weight-side{text-align:right;line-height:1.6;}
+    .pcs-note{font-weight:normal;color:#555;font-size:11px;}
+    .grand{margin-top:12px;padding-top:10px;border-top:2px solid #000;font-size:15px;font-weight:bold;}
+  </style>
+  </head><body>
+    <h2>Packing Slip</h2>
+
+    <div class="hdr">
+      <div class="row">
+        <div class="meta"><b>Date:</b> ${esc(formatPDFDate_(date))}</div>
+        <div class="meta"><b>Gen Time:</b> ${esc(pdfGenTime)}</div>
+      </div>
+      <div class="row">
+        <div class="meta"><b>Bill To:</b> ${esc(customerName)}</div>
+        <div class="meta"><b>Ship To:</b> ${esc(shipTo)}</div>
+      </div>
+      <div class="row">
+        <div class="meta"><b>Driver:</b> ${esc(driverName)} (${esc(driverNumber)})</div>
+        <div class="meta"><b>Vehicle:</b> ${esc(vehicleNumber)}</div>
+      </div>
+      <div class="row">
+        <div class="meta"><b>Loader:</b> ${esc(loaderName)}</div>
+        <div class="meta"><b>Dispatch ID:</b> ${esc(dispatchId)}</div>
+      </div>
+      ${ pkDisplay ? `<div class="row" style="margin-top:4px;"><div class="meta" style="flex:1;"><b>${pkLabel}:</b> ${esc(pkDisplay)}</div></div>` : "" }
+    </div>
+    ${itemRows}
+    <div class="grand">
+      ${unitsHtml}
+      <div>Grand Total Weight: ${fmt2(grandTotalWeight)} kg</div>
+    </div>
+  </body></html>`;
+}
+
+function _htmlToPdfDataUrl_(html, filename) {
+  const blob = Utilities.newBlob(html, "text/html", "challan.html").getAs("application/pdf").setName(filename);
+  return "data:application/pdf;base64," + Utilities.base64Encode(blob.getBytes());
+}
+
+function _isValidPdfDataUrl_(d) { try{ return Utilities.base64Decode(d.split(",")[1]).length > 10; }catch(e){return false;} }
+function _driveHtmlToPdfDataUrl_(h, f) {
+  const t = DriveApp.createFile("temp.html", h, MimeType.HTML);
+  const b = t.getAs(MimeType.PDF).setName(f).getBytes();
+  DriveApp.removeFile(t);
+  return "data:application/pdf;base64," + Utilities.base64Encode(b);
+}
+
+function _savePdfToDriveFolder_(html, filename, folderName) {
+    var folder = (folderName && (function(){try{return DriveApp.getFolderById(folderName);}catch(e){return null;}})()) || DriveApp.getRootFolder();
+  var _tmp = DriveApp.createFile("challan.html", html, MimeType.HTML);
+  var pdf = _tmp.getAs(MimeType.PDF).setName(filename);
+  _tmp.setTrashed(true);
+  folder.createFile(pdf);
+}
+
+/* ===================================================================
+    SAVE TO INWARD — writes current submission rows. Returns ONLY the
+    current submission's data (no past INWARD data is read or returned).
+    transportName is saved to column 21 (it is not printed on the PDF).
+=================================================================== */
+function _saveFormAndGetPayload_(formData) {
+  const { entries, timestamp, duration, driverName, vehicleNumber, driverNumber, loaderName, transportName, pdfGenTime, orderId, dispatchId } = formData;
+
+  const ss = SpreadsheetApp.getActive();
+  const sheet = ss.getSheetByName("INWARD");
+  if (!sheet) throw new Error("INWARD sheet not found");
+
+  const PREFIX = "DSP-";
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error("Could not acquire lock");
+
+  try {
+    // --- DUPLICATE PREVENTION (3-min window on pdfGenTime) ---
+    const nowTime = new Date(timestamp).getTime();
+    const lastRow = sheet.getLastRow();
+    if (lastRow >= 2) {
+      const startRow = Math.max(2, lastRow - 49);
+      const numRows = lastRow - startRow + 1;
+      const checkRange = sheet.getRange(startRow, 2, numRows, 17).getValues();
+      const pdfGenStr = String(pdfGenTime);
+      let isDuplicate = false;
+      for (let i = 0; i < checkRange.length; i++) {
+        const r = checkRange[i];
+        const rowTimestamp = new Date(r[0]).getTime();
+        const rowPdfGenTime = r[16];
+        if (Math.abs(nowTime - rowTimestamp) < 180000 && String(rowPdfGenTime) === pdfGenStr) {
+          isDuplicate = true;
+          break;
+        }
+      }
+      if (isDuplicate) {
+        throw new Error("STRICT BLOCK: This entry is a duplicate (same PDF generation time within 3 minutes). Process aborted.");
+      }
+    }
+    // --- END DUPLICATE PREVENTION ---
+
+    let newDispatchId;
+    let incomingId = orderId || dispatchId;
+
+    if (incomingId &&
+        String(incomingId).trim() !== "" &&
+        String(incomingId).toLowerCase() !== "undefined" &&
+        String(incomingId).toLowerCase() !== "null") {
+      newDispatchId = String(incomingId).trim();
+    } else {
+      const lastSeq = getLastDispatchSeq_(sheet);
+      newDispatchId = fmtDispatchId_(PREFIX, lastSeq + 1);
+    }
+
+    // ============ PARTIAL DETECTION + PACKING ID (NEW) ============
+    let isPartialSubmission = false;
+    try {
+      for (let _i = 0; _i < entries.length; _i++) {
+        const _e = entries[_i];
+        const _oq = Number(_e && _e.orderQty) || 0;
+        const _bl = Array.isArray(_e && _e.boras) ? _e.boras.length : 0;
+        if (_oq > 0 && _bl > 0 && _bl < _oq) { isPartialSubmission = true; break; }
+      }
+    } catch (e) { isPartialSubmission = false; }
+
+    // ALWAYS generate a unique Packing ID so the downloaded PDF is named
+    // CustomerName_PCK-XXXX.pdf for every submission (partial or full).
+    let newPackingId = "";
+    {
+      const lastPSeq = getLastPackingSeq_(sheet);
+      newPackingId = fmtPackingId_(lastPSeq + 1);
+    }
+    // ============ END PARTIAL DETECTION ============
+
+    let headerDate = "", headerCust = "", headerShip = "";
+    let sr = sheet.getLastRow();
+    const pdfItems = [];     // <-- SIRF current submission ke items
+    const rowsToWrite = [];
+
+    const durationStr = duration + " sec";
+    const transportSafe = transportName || "";
+
+    // Master pcs map (for avg per pcs)
+    const pcsMap = getMasterPcsMap_();
+
+    // ====================================================
+    // CURRENT SUBMISSION ENTRIES — nothing is read from INWARD.
+    // pdfItems is built only from the data coming from the form.
+    // ====================================================
+    entries.forEach(({itemName, itemDescription, date, customerName, shipTo, contractorName, packerName, packingType, orderQty, boras = []}) => {
+      if (!Array.isArray(boras)) boras = [];
+      if (!headerDate) headerDate = new Date();
+      if (!headerCust) headerCust = customerName;
+      if (!headerShip) headerShip = shipTo;
+      const pType = packingType || "Bora";
+      const descSafe = itemDescription || "";
+      const packerSafe = packerName || "";
+      const oQtySafe = orderQty || "";
+
+      const borasLen = boras.length;
+      for (let i = 0; i < borasLen; i++) {
+        sr++;
+        rowsToWrite.push([
+          sr,                  // 1
+          timestamp,           // 2
+          itemName,            // 3
+          descSafe,            // 4
+          date,                // 5
+          newDispatchId,       // 6
+          customerName,        // 7
+          shipTo,              // 8
+          i + 1,               // 9
+          boras[i],            // 10
+          contractorName,      // 11
+          packerSafe,          // 12
+          durationStr,         // 13
+          driverName,          // 14
+          vehicleNumber,       // 15
+          driverNumber,        // 16
+          loaderName,          // 17
+          pdfGenTime,          // 18
+          pType,               // 19
+          oQtySafe,            // 20
+          transportSafe,       // 21  <- Transport Name (save only)
+          newPackingId        // 22  <- Packing ID (NEW; empty if not partial)
+        ]);
+      }
+
+      // PDF payload: only the current submission's item — this is what prints
+      pdfItems.push({
+        itemName: itemName,
+        itemDescription: descSafe,
+        weights: boras.slice(),           // copy, so later mutation doesn't affect PDF
+        contractorName: contractorName,
+        packingType: pType,
+        pcsPerUnit: _pcsPerUnitFor_(pcsMap, itemName, pType)
+      });
+    });
+
+    // SINGLE BATCH WRITE — each row is appended to INWARD
+    if (rowsToWrite.length > 0) {
+      const startWriteRow = sheet.getLastRow() + 1;
+      sheet.getRange(startWriteRow, 1, rowsToWrite.length, rowsToWrite[0].length).setValues(rowsToWrite);
+      SpreadsheetApp.flush();
+    }
+
+    // INWARD list cache invalidate
+    _invalidateListCaches_();
+
+    // ====================================================
+    // Compute Bora / Bale / Box counts separately
+    // ====================================================
+    let gBora = 0, gBale = 0, gBox = 0, gWeight = 0;
+    entries.forEach(e => {
+      const b = Array.isArray(e.boras) ? e.boras : [];
+      const c = b.length;
+      gWeight += b.reduce((x, y) => x + (+y || 0), 0);
+      const pt = String(e.packingType || "Bora").toLowerCase();
+      if (pt === "bale") gBale += c;
+      else if (pt === "box") gBox += c;
+      else gBora += c;
+    });
+
+    return {
+      dispatchId: newDispatchId,
+      packingId: newPackingId,
+      isPartial: isPartialSubmission,
+      date: headerDate,
+      customerName: headerCust,
+      shipTo: headerShip,
+      driverName, vehicleNumber, driverNumber, loaderName,
+      transportName: transportSafe,
+      pdfGenTime,
+      items: pdfItems,
+      grandTotalBora: gBora,
+      grandTotalBale: gBale,
+      grandTotalBox: gBox,
+      grandTotalWeight: gWeight
+    };
+  } finally { lock.releaseLock(); }
+}
+
+/* ===================================================================
+    SUBMIT FLOW — PDF banata hai SIRF current submission se.
+=================================================================== */
+function submitFormAndCreatePDF(formData) {
+  try {
+    const p = _saveFormAndGetPayload_(formData);
+    if (!p.items) p.items = [];
+
+    const pForPdf = Object.assign({}, p, { pdfGenTime: formatPDFTime_(p.pdfGenTime), packingId: p.packingId || "" });
+    const htmlPdf = _getChallanHTML_(pForPdf);
+    // Filename now uses PCK id (CustomerName_PCK-XXXX.pdf); fall back to DSP id only if PCK is missing.
+    const _idForFile = (p.packingId && String(p.packingId).trim()) ? p.packingId : p.dispatchId;
+    const file = p.customerName + "_" + _idForFile + ".pdf";
+
+    let url = _htmlToPdfDataUrl_(htmlPdf, file);
+    if (!_isValidPdfDataUrl_(url)) url = _driveHtmlToPdfDataUrl_(htmlPdf, file);
+    try { _savePdfToDriveFolder_(htmlPdf, file, "1OsUBnSP8oXvmHfMEGxVb_KyjeIw7JEIz"); } catch (e) {}
+
+    // ============ PARTIAL PACKING PDF (DISABLED) ============
+    // The main PDF above is already named CustomerName_PCK-XXXX.pdf for every
+    // submission, so the previously-extra second PDF is no longer required.
+    // (Reprint flow still has its own DSP & PCK PDF functions.)
+    let packingDataUrl = "";
+    let packingFilename = "";
+    // ============ END PARTIAL PACKING PDF ============
+
+    return {
+      success: true,
+      dataUrl: url,
+      filename: file,
+      packingId: p.packingId || "",
+      isPartial: !!p.isPartial,
+      packingDataUrl: packingDataUrl,
+      packingFilename: packingFilename
+    };
+  } catch (err) {
+    return { success:false, error: err.message || String(err) };
+  }
+}
+
+/* ===================================================================
+    REGENERATE / REPRINT FLOW — builds the PDF from INWARD, using ALL
+    rows of that dispatchId (cumulative across all submissions).
+    transportName is read from column 21 (saved); Bora/Bale/Box are
+    counted separately; avg per pcs comes from the Master sheet.
+=================================================================== */
+function createChallanPDF(dispatchIdInput) {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName("INWARD");
+  if (!sh) throw new Error("INWARD sheet not found");
+
+  const last = sh.getLastRow();
+  if (last < 2) throw new Error("No data found in INWARD sheet");
+
+  // Full INWARD data — read up to 22 columns (col 22 = optional Packing ID)
+  const _lastColC = sh.getLastColumn();
+  const _readCols = Math.max(21, Math.min(22, _lastColC));
+  const data = sh.getRange(2, 1, last - 1, _readCols).getValues();
+
+  let date="", cust="", ship="", driver="", veh="", dnum="", loader="", gtime="", transport="";
+  const __pkSet = new Set();
+  const map = Object.create(null);
+  const dispatchIdTrim = String(dispatchIdInput).trim();
+  const dataLen = data.length;
+
+  // =====================================================
+  // Pick ALL rows belonging to this dispatchId
+  // =====================================================
+  for (let idx = 0; idx < dataLen; idx++) {
+    const r = data[idx];
+    const dId = r[5];
+    if (String(dId).trim() !== dispatchIdTrim) continue;
+
+    const item = r[2];
+    const desc = r[3];
+    const ts = r[1];
+    const cu = r[6];
+    const sp = r[7];
+    const w = r[9];
+    const cont = r[10];
+    const dN = r[13];
+    const vN = r[14];
+    const dM = r[15];
+    const lN = r[16];
+    const pT = r[17];      // pdfGenTime
+    const pType = r[18];   // Bora / Bale / Box
+    const tN = r[20];      // transport name (col 21)
+
+    if (!date) {
+      date = ts; cust = cu; ship = sp;
+      driver = dN; veh = vN; dnum = dM; loader = lN; gtime = pT;
+      transport = tN || "";
+    }
+
+    // Capture ALL unique non-empty Packing IDs (col 22) seen for this dispatch (if any)
+    try {
+      if (r.length >= 22) {
+        const _pk = String(r[21] || "").trim();
+        if (_pk) __pkSet.add(_pk);
+      }
+    } catch(e){}
+
+    // Group by item + desc + contractor + packingType
+    // (packingType is in the key so Bora / Bale / Box show as separate blocks)
+    const groupKey = String(item) + "|" + String(desc || "") + "|" + String(cont || "") + "|" + String(pType || "Bora");
+
+    let g = map[groupKey];
+    if (!g) {
+      g = {
+        itemName: item,
+        weights: [],
+        itemDescription: desc,
+        contractor: cont,
+        packingType: pType || "Bora"
+      };
+      map[groupKey] = g;
+    }
+    if (w) g.weights.push(w);
+  }
+
+  if (!date) throw new Error("Challan Number " + dispatchIdInput + " not found in INWARD records.");
+
+  // Master pcs map (for avg per pcs)
+  const pcsMap = getMasterPcsMap_();
+
+  const items = Object.keys(map).map(k => ({
+    itemName: map[k].itemName,
+    itemDescription: map[k].itemDescription,
+    weights: map[k].weights,
+    contractorName: map[k].contractor,
+    packingType: map[k].packingType,
+    pcsPerUnit: _pcsPerUnitFor_(pcsMap, map[k].itemName, map[k].packingType)
+  }));
+
+  // Cumulative totals — Bora / Bale / Box counted separately
+  let totalBora = 0, totalBale = 0, totalBox = 0, totalWeight = 0;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const wArr = it.weights;
+    const c = wArr.length;
+    for (let j = 0; j < c; j++) totalWeight += (+wArr[j] || 0);
+    const pt = String(it.packingType || "Bora").toLowerCase();
+    if (pt === "bale") totalBale += c;
+    else if (pt === "box") totalBox += c;
+    else totalBora += c;
+  }
+
+  const payload = {
+    dispatchId: dispatchIdInput,
+    packingId: (Array.from(__pkSet).sort().join(", ")) || "",
+    date: date,
+    customerName: cust,
+    shipTo: ship,
+    driverName: driver,
+    vehicleNumber: veh,
+    driverNumber: dnum,
+    loaderName: loader,
+    transportName: transport,
+    pdfGenTime: gtime,
+    items: items,
+    grandTotalBora: totalBora,
+    grandTotalBale: totalBale,
+    grandTotalBox: totalBox,
+    grandTotalWeight: totalWeight
+  };
+
+  const payloadForPdf = Object.assign({}, payload, { pdfGenTime: formatPDFTime_(payload.pdfGenTime) });
+  const htmlPdf = _getChallanHTML_(payloadForPdf);
+  const file = cust + "_" + dispatchIdInput + ".pdf";
+
+  let url = _htmlToPdfDataUrl_(htmlPdf, file);
+  if (!_isValidPdfDataUrl_(url)) url = _driveHtmlToPdfDataUrl_(htmlPdf, file);
+
+  return { dataUrl:url, filename:file };
+}
+
+/* ===========================
+    PACKING PDF REPRINT (NEW)
+    Rebuilds the PDF from INWARD using ALL rows that share the given PCK id
+    in column 22. Same template as createChallanPDF.
+=========================== */
+function createPackingPDF(packingIdInput) {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName("INWARD");
+  if (!sh) throw new Error("INWARD sheet not found");
+
+  const last = sh.getLastRow();
+  if (last < 2) throw new Error("No data found in INWARD sheet");
+
+  const lastCol = sh.getLastColumn();
+  const colsToRead = Math.max(22, lastCol);
+  if (colsToRead < 22) throw new Error("Packing ID column (22) not found in INWARD");
+
+  const data = sh.getRange(2, 1, last - 1, 22).getValues();
+
+  let date="", cust="", ship="", driver="", veh="", dnum="", loader="", gtime="", transport="", parentDispatch="";
+  const map = Object.create(null);
+  const packingIdTrim = String(packingIdInput).trim();
+  const dataLen = data.length;
+
+  for (let idx = 0; idx < dataLen; idx++) {
+    const r = data[idx];
+    const pid = String(r[21] || "").trim(); // col 22 = Packing ID
+    if (pid !== packingIdTrim) continue;
+
+    const ts = r[1];
+    const item = r[2];
+    const desc = r[3];
+    const dispId = r[5];
+    const cu = r[6];
+    const sp = r[7];
+    const w = r[9];
+    const cont = r[10];
+    const dN = r[13];
+    const vN = r[14];
+    const dM = r[15];
+    const lN = r[16];
+    const pT = r[17];      // pdfGenTime
+    const pType = r[18];   // Bora / Bale / Box
+    const tN = r[20];      // transport name
+
+    if (!date) {
+      date = ts; cust = cu; ship = sp;
+      driver = dN; veh = vN; dnum = dM; loader = lN; gtime = pT;
+      transport = tN || "";
+      parentDispatch = dispId || "";
+    }
+
+    const groupKey = String(item) + "|" + String(desc || "") + "|" + String(cont || "") + "|" + String(pType || "Bora");
+    let g = map[groupKey];
+    if (!g) {
+      g = {
+        itemName: item,
+        weights: [],
+        itemDescription: desc,
+        contractor: cont,
+        packingType: pType || "Bora"
+      };
+      map[groupKey] = g;
+    }
+    if (w) g.weights.push(w);
+  }
+
+  if (Object.keys(map).length === 0) throw new Error("Packing ID " + packingIdInput + " not found in INWARD records.");
+
+  const pcsMap = getMasterPcsMap_();
+
+  const items = Object.keys(map).map(k => ({
+    itemName: map[k].itemName,
+    itemDescription: map[k].itemDescription,
+    weights: map[k].weights,
+    contractorName: map[k].contractor,
+    packingType: map[k].packingType,
+    pcsPerUnit: _pcsPerUnitFor_(pcsMap, map[k].itemName, map[k].packingType)
+  }));
+
+  let totalBora = 0, totalBale = 0, totalBox = 0, totalWeight = 0;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const wArr = it.weights;
+    const c = wArr.length;
+    for (let j = 0; j < c; j++) totalWeight += (+wArr[j] || 0);
+    const pt = String(it.packingType || "Bora").toLowerCase();
+    if (pt === "bale") totalBale += c;
+    else if (pt === "box") totalBox += c;
+    else totalBora += c;
+  }
+
+  const payload = {
+    dispatchId: parentDispatch || "", // original Dispatch ID stays in header
+    packingId: packingIdInput,        // and the Packing ID is shown explicitly
+    date: date,
+    customerName: cust,
+    shipTo: ship,
+    driverName: driver,
+    vehicleNumber: veh,
+    driverNumber: dnum,
+    loaderName: loader,
+    transportName: transport,
+    pdfGenTime: gtime,
+    items: items,
+    grandTotalBora: totalBora,
+    grandTotalBale: totalBale,
+    grandTotalBox: totalBox,
+    grandTotalWeight: totalWeight
+  };
+
+  const payloadForPdf = Object.assign({}, payload, { pdfGenTime: formatPDFTime_(payload.pdfGenTime) });
+  const htmlPdf = _getChallanHTML_(payloadForPdf);
+  const file = cust + "_" + packingIdInput + ".pdf";
+    try { _savePdfToDriveFolder_(htmlPdf, file, "1OsUBnSP8oXvmHfMEGxVb_KyjeIw7JEIz"); } catch (e) {}
+
+  let url = _htmlToPdfDataUrl_(htmlPdf, file);
+  if (!_isValidPdfDataUrl_(url)) url = _driveHtmlToPdfDataUrl_(htmlPdf, file);
+
+  return { dataUrl:url, filename:file };
+}
