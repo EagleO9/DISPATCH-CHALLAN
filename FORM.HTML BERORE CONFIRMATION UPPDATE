@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8"/>
+  <title>Packing Entry Form - Pro</title>
+  <style>
+    :root {
+      --primary: #0d6efd;
+      --danger: #dc3545;
+      --success: #198754;
+      --warning: #ffc107;
+      --info: #0dcaf0;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #334155;
+    }
+
+    *{box-sizing:border-box;}
+    body{
+      font-family:'Inter', 'Segoe UI', sans-serif;
+      background: var(--bg);
+      margin:0; padding:20px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .container{
+      max-width: 1300px;
+      margin: auto;
+      background: var(--card-bg);
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    }
+
+    h2{
+      text-align: center;
+      color: var(--primary);
+      margin-bottom: 30px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .search-section {
+      background: #e0f2fe;
+      border: 2px solid #bae6fd;
+      padding: 15px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .search-section label { margin-bottom: 0; color: #0369a1; font-weight:bold; }
+    .search-section select { border-color: #7dd3fc; background: #fff; max-width: 300px; }
+
+    label{
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: block;
+      font-size: 0.9rem;
+      color: #64748b;
+    }
+
+    input, select{
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background-color: #fcfcfc;
+      transition: all 0.2s ease;
+      font-size: 1rem;
+    }
+
+    input:focus, select:focus{
+      border-color: var(--primary);
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+    }
+
+    input[readonly], select[disabled] {
+      background-color: #f1f5f9 !important;
+      color: #475569 !important;
+      cursor: not-allowed;
+      border-color: #cbd5e1 !important;
+    }
+
+    input.error-input, select.error-input {
+      border: 2px solid var(--danger) !important;
+      background-color: #fff5f5;
+    }
+    
+    input.info-input {
+      background-color: #e2e8f0;
+      color: #475569;
+      font-weight: bold;
+      border-color: #cbd5e1;
+      cursor: not-allowed;
+    }
+
+    .pending-box {
+      background-color: #fef9c3 !important;
+      color: #854d0e !important;
+      border-color: #fde047 !important;
+    }
+
+    .row{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .item-header-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .entry{
+      background: #ffffff;
+      border: 2px solid #f1f5f9;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      position: relative;
+      transition: border-color 0.2s;
+    }
+
+    .entry:hover {
+      border-color: #e2e8f0;
+    }
+
+    .remove-entry{
+      position: absolute;
+      right: 15px; top: 15px;
+      border: 1px solid #fee2e2;
+      background: #fef2f2;
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      color: var(--danger);
+      font-size: 0.8rem;
+      font-weight: bold;
+      z-index: 10;
+    }
+
+    .remove-entry:hover {
+      background: var(--danger);
+      color: white;
+    }
+
+    .bora-btns button{
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-right: 10px;
+      font-weight: 600;
+      transition: opacity 0.2s;
+    }
+
+    .bora-btns button:active { opacity: 0.8; }
+
+    .btn-primary{ background: var(--primary); color: white; }
+    .btn-danger{ background: var(--danger); color: white; }
+    .btn-success{ background: var(--success); color: white; }
+    .btn-warning{ background: var(--warning); color: #000; }
+    .btn-info { background: var(--info); color: white; }
+
+    .roll-fields{
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+      padding: 15px;
+      background: #f8fafc;
+      border-radius: 8px;
+    }
+
+    .bora-item{
+      display: flex;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .bora-sn{
+      font-weight: bold;
+      margin-right: 8px;
+      color: var(--primary);
+      min-width: 20px;
+      font-size: 0.85rem;
+    }
+
+    .total-line{
+      margin-top: 15px;
+      font-weight: 700;
+      color: var(--primary);
+      background: #eff6ff;
+      padding: 12px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 20px;
+    }
+
+    .grand-summary{
+      background: #1e293b;
+      color: #fff;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 30px;
+      display: flex;
+      justify-content: space-around;
+      font-size: 1.2rem;
+      font-weight: 800;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    #loadingOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      z-index: 99999;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(3px);
+    }
+
+    #clickBlocker {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 99998;
+      cursor: not-allowed;
+    }
+
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    #toast{
+      visibility: hidden;
+      min-width: 300px;
+      background: #1e293b;
+      color: #fff;
+      text-align: center;
+      padding: 16px;
+      border-radius: 12px;
+      position: fixed;
+      bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+    #toast.show{ visibility: visible; animation: slideUp 0.4s, fadeOut 0.4s 2.6s; }
+
+    #alertModal {
+      display: none;
+      position: fixed;
+      z-index: 20000;
+      left: 0; top: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5);
+      backdrop-filter: blur(4px);
+    }
+    .modal-content {
+      background: white;
+      width: 90%; max-width: 400px;
+      margin: 15% auto;
+      padding: 25px;
+      border-radius: 16px;
+      text-align: center;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+    .modal-header { color: var(--danger); font-size: 1.5rem; font-weight: 800; margin-bottom: 10px; }
+    .modal-body { margin-bottom: 25px; color: #475569; font-weight: 500; font-size: 1.1rem; }
+    .modal-footer button { width: 100%; padding: 12px; font-weight: bold; border-radius: 8px; }
+
+    @keyframes slideUp { from { bottom: 0; opacity: 0; } to { bottom: 30px; opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+    hr { border: 0; border-top: 1px solid #e2e8f0; margin: 30px 0; }
+
+    /* ===== Reprint search section styling ===== */
+    .reprint-section {
+      margin-top: 50px;
+      padding: 25px;
+      background: #fffbeb;
+      border: 2px dashed #fde047;
+      border-radius: 12px;
+    }
+    .reprint-title {
+      color: #854d0e;
+      font-weight: 800;
+      margin: 0 0 15px 0;
+      font-size: 1.1rem;
+    }
+    .search-wrap {
+      position: relative;
+    }
+    .dispatch-suggestions {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #cbd5e1;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      max-height: 240px;
+      overflow-y: auto;
+      z-index: 1000;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    }
+    .suggestion-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .suggestion-item:hover {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+    .suggestion-item.no-match {
+      color: #94a3b8;
+      cursor: default;
+      font-style: italic;
+      font-weight: normal;
+    }
+    .suggestion-item.no-match:hover {
+      background: transparent;
+      color: #94a3b8;
+    }
+    .suggestion-item .hl {
+      background: #ffe066;
+      padding: 1px 2px;
+      border-radius: 3px;
+      font-weight: 800;
+    }
+
+    @media (max-width: 768px) {
+      .item-header-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="clickBlocker"></div>
+
+  <div id="loadingOverlay">
+    <div class="spinner"></div>
+    <p style="margin-top:20px; font-weight:800; color:var(--primary); font-size:1.2rem;">GENERATING PDF... PLEASE WAIT</p>
+    <p style="color:#64748b;">Do not refresh or close this page.</p>
+  </div>
+
+  <div class="container">
+    <h2>📦 Order Dispatch Entry </h2>
+
+    <div class="search-section">
+      <div style="flex-grow:1;">
+        <label>🔍 Select Order (Dispatch ID)</label>
+        <select id="loadOrderSelect" onchange="fetchOrderData(this.value)">
+          <option value="">— Loading Orders... —</option>
+        </select>
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button class="btn-primary" onclick="initForm()" style="padding:10px 20px;">Reset Form</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div><label>Date</label><input type="date" id="date"></div>
+      <div><label>Customer (Bill To)</label><input type="text" id="mainCustomer" placeholder="Enter Party Name"></div>
+      <div><label>Ship To </label><input type="text" id="shipTo" placeholder="Enter Receiver Name "></div>
+    </div>
+
+    <div class="row">
+      <div><label>Driver Name</label><input type="text" id="driverName" placeholder="Name"></div>
+      <div><label>Vehicle Number</label><input type="text" id="vehicleNumber" placeholder="XX 00 XX 0000"></div>
+      <div><label>Driver Mobile</label><input type="tel" id="driverNumber" placeholder="10 Digit Number"></div>
+    </div>
+
+    <div class="row">
+      <div><label>Loader Name</label><input type="text" id="loaderName" placeholder="Loader's Name"></div>
+      <div><label>PDF Time</label><input type="text" id="pdfGenTime" readonly style="background:#f1f5f9;"></div>
+    </div>
+
+    <!-- ===== Transport Name (for records only — NOT printed on the PDF) ===== -->
+    <div class="row">
+      <div>
+        <label>🚚 Transport Name <span style="color:#94a3b8; font-weight:normal;">(for records only)</span></label>
+        <input type="text" id="transportName" placeholder="Enter Transport Company Name">
+      </div>
+    </div>
+
+    <hr>
+
+    <div id="formContainer"></div>
+
+    <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+      <button class="btn-primary" id="addItemBtn" onclick="addEntry()" style="padding:12px 20px;">+ Add New Item</button>
+      
+      <div class="total-line" style="margin-top:0;">
+        <span>Grand Weight: <span id="grandWeight">0.00</span> KG</span>
+        <span>Total Units: <span id="grandBora">0</span></span>
+      </div>
+    </div>
+
+    <div class="grand-summary" id="bottomGrandSummary" style="display:none;">
+      <span>TOTAL WEIGHT: <span id="summaryWeight">0.00</span> KG</span>
+      <span>TOTAL BORAS/BALES: <span id="summaryBora">0</span></span>
+    </div>
+
+    <div style="margin-top:40px; text-align:right;">
+      <button class="btn-success" id="submitBtn" style="padding:16px 40px; font-size:1.1rem; border-radius:12px; box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3); touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
+        Submit &amp; Generate PDF
+      </button>
+    </div>
+
+    <!-- ===== Reprint Section: Dispatch + Packing (UPDATED) ===== -->
+    <div class="reprint-section">
+      <div class="reprint-title">🔁 Reprint Old Dispatch Challan</div>
+      <div class="row" style="margin-bottom:0;">
+        <div class="search-wrap">
+          <label>🔎 Search Dispatch ID <span style="color:#64748b; font-weight:normal;">(type digits, e.g. <b>0042</b>)</span></label>
+          <input type="text" id="dispatchSearchInput" placeholder="Type digits or DSP- to search..." autocomplete="off"
+                 oninput="filterDispatchSuggestions(this.value)"
+                 onfocus="filterDispatchSuggestions(this.value)"
+                 onkeydown="handleSearchKeydown(event)">
+          <div id="dispatchSuggestions" class="dispatch-suggestions" style="display:none;"></div>
+        </div>
+        <div>
+          <label>Or Pick Old Dispatch ID</label>
+          <select id="dispatchSelect" onchange="onDispatchSelectChange(this.value)">
+            <option value="">— Select Old Dispatch ID —</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button class="btn-warning" onclick="createSelectedDispatchPDF()" style="width:100%; height:45px; border-radius:8px; font-weight:bold;">⬇️ Download Dispatch PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Reprint Section: Packing ID (NEW) ===== -->
+    <div class="reprint-section" style="border-top:3px dashed #f59e0b; margin-top:14px;">
+      <div class="reprint-title" style="color:#b45309;">📦 Reprint Old Packing Challan</div>
+      <div class="row" style="margin-bottom:0;">
+        <div class="search-wrap">
+          <label>🔎 Search Packing ID <span style="color:#64748b; font-weight:normal;">(type digits or <b>PCK-</b>)</span></label>
+          <input type="text" id="packingSearchInput" placeholder="Type digits or PCK- to search..." autocomplete="off"
+                 oninput="filterPackingSuggestions(this.value)"
+                 onfocus="filterPackingSuggestions(this.value)"
+                 onkeydown="handlePackingSearchKeydown(event)">
+          <div id="packingSuggestions" class="dispatch-suggestions" style="display:none;"></div>
+        </div>
+        <div>
+          <label>Or Pick Old Packing ID</label>
+          <select id="packingSelect" onchange="onPackingSelectChange(this.value)">
+            <option value="">— Select Old Packing ID —</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:flex-end;">
+          <button class="btn-warning" onclick="createSelectedPackingPDF()" style="width:100%; height:45px; border-radius:8px; font-weight:bold; background:#f59e0b;">⬇️ Download Packing PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast"></div>
+  </div>
+
+  <div id="alertModal">
+    <div class="modal-content">
+      <div class="modal-header">System Alert</div>
+      <div class="modal-body" id="alertModalBody"></div>
+      <div class="modal-footer">
+        <button class="btn-danger" onclick="closeAlertModal()">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <datalist id="itemList"></datalist>
+
+<script>
+let itemListArray = []; 
+let _allChallanList = [];   // full list cached for search
+let _suppressUnloadWarning = false;   // NEW: success reload pe warning suppress karne ke liye
+
+// ============================================================
+// CACHED DOM REFERENCES (PERFORMANCE)
+// ============================================================
+const _DOM = {};
+function _cacheDom() {
+  _DOM.formContainer  = document.getElementById("formContainer");
+  _DOM.mainCustomer   = document.getElementById("mainCustomer");
+  _DOM.shipTo         = document.getElementById("shipTo");
+  _DOM.driverName     = document.getElementById("driverName");
+  _DOM.vehicleNumber  = document.getElementById("vehicleNumber");
+  _DOM.driverNumber   = document.getElementById("driverNumber");
+  _DOM.loaderName     = document.getElementById("loaderName");
+  _DOM.transportName  = document.getElementById("transportName");
+  _DOM.date           = document.getElementById("date");
+  _DOM.loadOrderSel   = document.getElementById("loadOrderSelect");
+  _DOM.dispatchSel    = document.getElementById("dispatchSelect");
+  _DOM.dispatchSearch = document.getElementById("dispatchSearchInput");
+  _DOM.dispatchSugg   = document.getElementById("dispatchSuggestions");
+  _DOM.addItemBtn     = document.getElementById("addItemBtn");
+  _DOM.pdfGenTime     = document.getElementById("pdfGenTime");
+  _DOM.grandWeight    = document.getElementById("grandWeight");
+  _DOM.grandBora      = document.getElementById("grandBora");
+  _DOM.summaryWeight  = document.getElementById("summaryWeight");
+  _DOM.summaryBora    = document.getElementById("summaryBora");
+  _DOM.bottomGrandSum = document.getElementById("bottomGrandSummary");
+  _DOM.toast          = document.getElementById("toast");
+  _DOM.submitBtn      = document.getElementById("submitBtn");
+  _DOM.clickBlocker   = document.getElementById("clickBlocker");
+  _DOM.loadingOverlay = document.getElementById("loadingOverlay");
+  _DOM.alertModal     = document.getElementById("alertModal");
+  _DOM.alertModalBody = document.getElementById("alertModalBody");
+  _DOM.itemList       = document.getElementById("itemList");
+}
+
+// ============================================================
+// DOUBLE ENTRY PROTECTION — 4-Layer Guard System
+// ============================================================
+let __submitLock = false;
+let __lastSubmitTime = 0;
+const SUBMIT_DEBOUNCE_MS = 3000;
+
+let formStartTime = Date.now();
+
+function getISTTimestamp(){
+  return new Date().toLocaleString("en-IN",{timeZone:"Asia/Kolkata"});
+}
+function getISTTimeOnly(){
+  return new Date().toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata", hour12:true, hour:'2-digit', minute:'2-digit'});
+}
+
+// ============================================================
+// LOCK / UNLOCK HELPERS
+// ============================================================
+function _lockSubmission() {
+  __submitLock = true;
+  __lastSubmitTime = Date.now();
+
+  const sBtn = _DOM.submitBtn;
+  sBtn.disabled = true;
+  sBtn.setAttribute("disabled", "disabled");
+  sBtn.style.opacity = "0.5";
+  sBtn.style.pointerEvents = "none";
+  sBtn.style.cursor = "not-allowed";
+  sBtn.textContent = "Processing...";
+
+  document.body.setAttribute("data-submitting", "true");
+  _DOM.clickBlocker.style.display = "block";
+  _DOM.loadingOverlay.style.display = "flex";
+
+  window.onbeforeunload = function() {
+    return "PDF is being generated. Are you sure you want to leave?";
+  };
+}
+
+function _unlockSubmission() {
+  __submitLock = false;
+
+  const sBtn = _DOM.submitBtn;
+  sBtn.disabled = false;
+  sBtn.removeAttribute("disabled");
+  sBtn.style.opacity = "1";
+  sBtn.style.pointerEvents = "auto";
+  sBtn.style.cursor = "pointer";
+  sBtn.textContent = "Submit & Generate PDF";
+
+  document.body.removeAttribute("data-submitting");
+  _DOM.clickBlocker.style.display = "none";
+  _DOM.loadingOverlay.style.display = "none";
+
+  window.onbeforeunload = null;
+}
+
+// ============================================================
+// INIT FORM — PARALLEL DATA LOADING (PERFORMANCE)
+// ============================================================
+function initForm() {
+  if (__submitLock) {
+    showToast("Submission in progress. Please wait...", true);
+    return;
+  }
+
+  _DOM.formContainer.innerHTML = "";
+  _DOM.mainCustomer.value = "";
+  _DOM.shipTo.value = "";
+  _DOM.driverName.value = "";
+  _DOM.vehicleNumber.value = "";
+  _DOM.driverNumber.value = "";
+  _DOM.loaderName.value = "";
+  _DOM.transportName.value = "";
+  _DOM.date.valueAsDate = new Date();
+  _DOM.loadOrderSel.value = "";
+  
+  _DOM.date.readOnly = false;
+  _DOM.mainCustomer.readOnly = false;
+  _DOM.shipTo.readOnly = false;
+
+  _DOM.addItemBtn.style.display = "block";
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    // PARALLEL FIRE: all 3 calls dispatched simultaneously
+    google.script.run.withSuccessHandler(function(items){
+      itemListArray = items || [];
+      updateDatalist(itemListArray);
+      if (!_DOM.formContainer.children.length) addEntry();
+    }).getItemList();
+
+    google.script.run.withSuccessHandler(function(list){
+      const sel = _DOM.loadOrderSel;
+      const frag = document.createDocumentFragment();
+      const def = document.createElement("option");
+      def.value = "";
+      def.textContent = "— Select Order / Dispatch ID —";
+      frag.appendChild(def);
+      const len = list.length;
+      for (let i = 0; i < len; i++) {
+        const opt = document.createElement("option");
+        opt.value = list[i];
+        opt.textContent = list[i];
+        frag.appendChild(opt);
+      }
+      sel.innerHTML = "";
+      sel.appendChild(frag);
+    }).getOrderList();
+
+    google.script.run.withSuccessHandler(function(list){
+      _allChallanList = list || [];   // cache for search
+      const sel = _DOM.dispatchSel;
+      const frag = document.createDocumentFragment();
+      const def = document.createElement("option");
+      def.value = "";
+      def.textContent = "— Select Old Dispatch ID —";
+      frag.appendChild(def);
+      const len = list.length;
+      for (let i = 0; i < len; i++) {
+        const opt = document.createElement("option");
+        opt.value = list[i];
+        opt.textContent = list[i];
+        frag.appendChild(opt);
+      }
+      sel.innerHTML = "";
+      sel.appendChild(frag);
+    }).getChallanList(500);   // bumped from 200 → 500 for richer search
+
+    // ===== Load recent Packing IDs into the SEPARATE Packing dropdown (NEW) =====
+    google.script.run.withSuccessHandler(function(pkList){
+      const sel2 = document.getElementById("packingSelect");
+      if (!sel2) return;
+      if (!pkList || !pkList.length) {
+        // keep default option; no data yet
+        return;
+      }
+      const frag2 = document.createDocumentFragment();
+      for (let i = 0; i < pkList.length; i++) {
+        const id = pkList[i];
+        if (_allPackingList.indexOf(id) === -1) _allPackingList.push(id);
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = id;
+        frag2.appendChild(opt);
+      }
+      sel2.appendChild(frag2);
+    }).withFailureHandler(function(){}).getPackingList(500);
+
+  } else {
+    itemListArray = ["Cotton Roll", "Polyester Blend"];
+    updateDatalist(itemListArray);
+    addEntry();
+  }
+}
+
+// ============================================================
+// FETCH ORDER DATA
+// ============================================================
+function fetchOrderData(id) {
+  if(!id) return;
+  showToast("Checking Order Status...");
+  
+  google.script.run.withSuccessHandler(function(data){
+    if(!data || !data.found) {
+       showToast("Order ID not found!", true);
+       return;
+    }
+    
+    if(data.alreadySubmitted) {
+       showAlert("✅ ALREADY COMPLETED! \n\n This Dispatch ID ("+id+") has been completed and will be removed shortly. No pending items found.");
+       initForm(); 
+       return;
+    }
+
+    _DOM.addItemBtn.style.display = "none";
+
+    _DOM.date.value = data.date;
+    _DOM.date.readOnly = false; 
+    
+    _DOM.mainCustomer.value = data.customerName;
+    _DOM.mainCustomer.readOnly = true;
+    
+    _DOM.shipTo.value = data.shipTo;
+    _DOM.shipTo.readOnly = true;
+    
+    _DOM.formContainer.innerHTML = "";
+
+    if(data.items.length > 0) {
+      const frag = document.createDocumentFragment();
+      data.items.forEach(item => {
+        const _t = String(item.type || "").toLowerCase();
+        const _typeVal = _t.includes("bale") ? "Bale" : (_t.includes("box") ? "Box" : "Bora");
+        const initialData = {
+          name: item.itemName,
+          desc: item.itemDescription || item.description || "",
+          oQty: item.totalQty || item.qty || "-",
+          pQty: item.pendingQty || item.qty || "-",
+          type: _typeVal
+        };
+        const entryEl = addEntry(null, true, initialData);
+        frag.appendChild(entryEl);
+      });
+      _DOM.formContainer.appendChild(frag);
+      _DOM.formContainer.querySelectorAll(".entry").forEach(en => {
+        addBora(en.querySelector(".btn-primary"));
+      });
+      showToast("Order loaded with Descriptions!");
+    } else {
+      showToast("No pending items found.");
+      addEntry();
+    }
+  }).getOrderDetails(id);
+}
+
+function updateDatalist(items) {
+  const dl = _DOM.itemList;
+  const frag = document.createDocumentFragment();
+  const len = items.length;
+  for (let i = 0; i < len; i++) {
+    const o = document.createElement("option");
+    o.value = items[i];
+    frag.appendChild(o);
+  }
+  dl.innerHTML = "";
+  dl.appendChild(frag);
+}
+
+function showAlert(message) {
+  _DOM.alertModalBody.innerHTML = message.replace(/\n/g, '<br>');
+  _DOM.alertModal.style.display = "block";
+}
+function closeAlertModal() {
+  _DOM.alertModal.style.display = "none";
+}
+
+function checkItemValidity(input) {
+  const val = input.value;
+  if (!val || val.trim() === "") {
+      input.classList.add("error-input");
+      return;
+  }
+  input.classList.remove("error-input");
+}
+
+function addEntry(btn, returnDOM = false, data = null){
+  const entry = document.createElement("div");
+  entry.className = "entry";
+  
+  const iName = data ? data.name : "";
+  const iDesc = data ? data.desc : "";
+  const iOQty = data ? data.oQty : "-";
+  const iPQty = data ? data.pQty : "-";
+  const iType = data && data.type ? data.type : "";   // type from order/split; otherwise blank
+
+  const isLockedAttr = data ? "readonly" : "";
+  // When loaded from an order (or split), the Type is auto-filled AND
+  // disabled so it cannot be changed. A disabled <select> still exposes
+  // its .value to JavaScript, so submit/PDF read it correctly (no hidden
+  // input needed). For a fresh manual item the Type stays blank, enabled,
+  // and the user selects it.
+  const isLockedSelect = data ? "disabled" : "";
+  entry.innerHTML = `
+    <button class="remove-entry" onclick="removeEntry(this)">✖ Remove</button>
+    
+    <div class="item-header-row">
+      <div>
+        <label>Item Name</label>
+        <input type="text" name="itemName" list="itemList" value="${iName}" placeholder="Type to search..." 
+               onblur="checkItemValidity(this)" required autocomplete="off" ${isLockedAttr}>
+      </div>
+      <div>
+        <label>Description</label>
+        <input type="text" name="itemDescription" value="${iDesc ? iDesc.toString().replace(/"/g, '&quot;') : ''}" placeholder="Size / Color / Details" ${isLockedAttr}>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Order Qty</label>
+        <input type="text" name="orderQty" value="${iOQty}" class="info-input" readonly placeholder="-">
+      </div>
+      <div>
+        <label>Remaining</label>
+        <input type="text" name="pendingQty" value="${iPQty}" class="info-input pending-box" readonly placeholder="-">
+      </div>
+      <div>
+        <label>Contractor <span style="color:var(--danger);">*</span></label>
+        <input type="text" name="contractorName" placeholder="Contractor Name" required>
+      </div>
+      <div><label>Packer</label><input type="text" name="packerName" placeholder="Packer Name"></div>
+      <div>
+          <label>Type <span style="color:var(--danger);">*</span></label>
+          <select name="packingType" ${isLockedSelect}>
+            <option value="" disabled ${iType ? '' : 'selected'}>— Select —</option>
+            <option value="Bora" ${iType==='Bora'?'selected':''}>Bora</option>
+            <option value="Bale" ${iType==='Bale'?'selected':''}>Bale</option>
+            <option value="Box" ${iType==='Box'?'selected':''}>Box</option>
+          </select>
+      </div>
+    </div>
+
+    <div class="roll-fields"></div>
+    <div class="bora-btns" style="margin-top:15px;">
+      <button class="btn-primary" onclick="addBora(this)">+ Add Wt</button>
+      <button class="btn-danger" onclick="removeBora(this)">- Remove Last</button>
+      <button class="btn-info" onclick="duplicateEntry(this)" title="Split remaining stock into new block">📋 Split Entry</button>
+    </div>
+    <div class="total-line">
+      <span>Item Total: <span class="total-weight">0.00</span> KG</span>
+      <span>Count: <span class="bora-count">0</span></span>
+    </div>
+  `;
+
+  if(!returnDOM) {
+    _DOM.formContainer.appendChild(entry);
+    addBora(entry.querySelector(".btn-primary"));
+  }
+  
+  return entry;
+}
+
+function duplicateEntry(btn) {
+  const currentEntry = btn.closest(".entry");
+  const pQtyInput = currentEntry.querySelector("input[name='pendingQty']");
+  
+  const currentTotal = parseInt(pQtyInput.value) || 0;
+  const filledUnits = currentEntry.querySelectorAll("input[data-bora]").length;
+  
+  if (pQtyInput.value !== "-" && currentTotal <= filledUnits) {
+    showAlert("❌ LIMIT REACHED!\n\nFilled all " + currentTotal + " units. Nothing left to split.");
+    return;
+  }
+
+  let newBlockPending = pQtyInput.value === "-" ? "-" : (currentTotal - filledUnits);
+  
+  if (pQtyInput.value !== "-") {
+    pQtyInput.value = filledUnits;
+    showToast("Current block locked to " + filledUnits);
+  }
+
+  const data = {
+    name: currentEntry.querySelector("input[name='itemName']").value,
+    desc: currentEntry.querySelector("input[name='itemDescription']").value,
+    oQty: currentEntry.querySelector("input[name='orderQty']").value,
+    pQty: newBlockPending,
+    type: currentEntry.querySelector("select[name='packingType']").value || ""
+  };
+  
+  const newEntry = addEntry(null, true, data);
+  currentEntry.insertAdjacentElement('afterend', newEntry);
+  addBora(newEntry.querySelector(".btn-primary"));
+  
+  showToast("Balance " + newBlockPending + " units moved to next block.");
+}
+
+function removeEntry(btn){
+  const entryToRemove = btn.closest(".entry");
+  const itemName = entryToRemove.querySelector("input[name='itemName']").value;
+  const itemDesc = entryToRemove.querySelector("input[name='itemDescription']").value;
+  const pQtyRemoved = parseInt(entryToRemove.querySelector("input[name='pendingQty']").value) || 0;
+
+  const allEntries = _DOM.formContainer.querySelectorAll(".entry");
+  if(allEntries.length > 1){
+    const entriesArr = Array.from(allEntries);
+    const currentIndex = entriesArr.indexOf(entryToRemove);
+
+    for (let i = currentIndex - 1; i >= 0; i--) {
+      const prevEntry = entriesArr[i];
+      const prevName = prevEntry.querySelector("input[name='itemName']").value;
+      const prevDesc = prevEntry.querySelector("input[name='itemDescription']").value;
+      const prevPQtyInput = prevEntry.querySelector("input[name='pendingQty']");
+
+      if (prevName === itemName && prevDesc === itemDesc && prevPQtyInput.value !== "-") {
+          const currentPrevVal = parseInt(prevPQtyInput.value) || 0;
+          prevPQtyInput.value = currentPrevVal + pQtyRemoved;
+          showToast("Stock (" + pQtyRemoved + ") returned to previous block.");
+          break;
+      }
+    }
+
+    entryToRemove.remove();
+    recalcGrand();
+  } else {
+    showToast("At least one item is required", true);
+  }
+}
+
+function addBora(btnOrEntry){
+  const entry = btnOrEntry.closest ? btnOrEntry.closest(".entry") : btnOrEntry;
+  const pQtyInput = entry.querySelector("input[name='pendingQty']");
+  const div = entry.querySelector(".roll-fields");
+  const currentCount = div.children.length;
+
+  if (pQtyInput && pQtyInput.value && pQtyInput.value !== "-") {
+      const max = parseInt(pQtyInput.value) || 0;
+      if (max > 0 && currentCount >= max) {
+          showToast(`Limit Reached! Block limit is ${max}`, true);
+          return;
+      }
+  }
+
+  const count = currentCount + 1;
+  const w = document.createElement("div");
+  w.className = "bora-item";
+  w.innerHTML = `
+    <span class="bora-sn">${count}.</span>
+    <input type="number" data-bora step="0.01" placeholder="0.00" oninput="recalc(this)" onkeydown="handleEnter(event, this)">
+  `;
+  div.appendChild(w);
+  w.querySelector("input").focus();
+}
+
+function handleEnter(e, input) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const entry = input.closest(".entry");
+    const allInputs = entry.querySelectorAll("input[data-bora]");
+    const arr = Array.from(allInputs);
+    const currentIndex = arr.indexOf(input);
+    if (currentIndex < arr.length - 1) {
+      arr[currentIndex + 1].focus();
+    } else {
+      addBora(entry);
+    }
+  }
+}
+
+function removeBora(btn){
+  const entry = btn.closest(".entry");
+  const div = entry.querySelector(".roll-fields");
+  if(div.lastChild) div.lastChild.remove();
+  recalc(btn);
+}
+
+function recalc(el){
+  if(!el) return;
+  const entry = el.closest(".entry");
+  let total = 0, count = 0;
+  const inputs = entry.querySelectorAll("input[data-bora]");
+  const len = inputs.length;
+  for (let i = 0; i < len; i++) {
+    const v = parseFloat(inputs[i].value) || 0;
+    if(v > 0){ total += v; count++; }
+  }
+  entry.querySelector(".total-weight").textContent = total.toFixed(2);
+  entry.querySelector(".bora-count").textContent = count;
+  _scheduleGrandRecalc();
+}
+
+let _grandRecalcPending = false;
+function _scheduleGrandRecalc() {
+  if (_grandRecalcPending) return;
+  _grandRecalcPending = true;
+  requestAnimationFrame(function() {
+    _grandRecalcPending = false;
+    recalcGrand();
+  });
+}
+
+function recalcGrand(){
+  let gWeight = 0, gBora = 0;
+  const entries = _DOM.formContainer.querySelectorAll(".entry");
+  const len = entries.length;
+  for (let i = 0; i < len; i++) {
+    const en = entries[i];
+    gWeight += parseFloat(en.querySelector(".total-weight").textContent) || 0;
+    gBora += parseInt(en.querySelector(".bora-count").textContent) || 0;
+  }
+  _DOM.grandWeight.textContent = gWeight.toFixed(2);
+  _DOM.grandBora.textContent = gBora;
+  const hasData = gBora > 0;
+  _DOM.bottomGrandSum.style.display = hasData ? "flex" : "none";
+  _DOM.summaryWeight.textContent = gWeight.toFixed(2);
+  _DOM.summaryBora.textContent = gBora;
+}
+
+// ============================================================
+// REPRINT SEARCH — type last digits, get live suggestions
+// ============================================================
+function _escAttr(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function _escHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// highlight the matched substring in suggestion
+function _highlightMatch(text, query) {
+  const t = String(text);
+  if (!query) return _escHtml(t);
+  const q = query.toLowerCase();
+  const lower = t.toLowerCase();
+  const idx = lower.indexOf(q);
+  if (idx === -1) return _escHtml(t);
+  const before = t.substring(0, idx);
+  const match = t.substring(idx, idx + q.length);
+  const after = t.substring(idx + q.length);
+  return _escHtml(before) + '<span class="hl">' + _escHtml(match) + '</span>' + _escHtml(after);
+}
+
+function filterDispatchSuggestions(query) {
+  const box = _DOM.dispatchSugg;
+  if (!box) return;
+
+  if (!query || !String(query).trim()) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+
+  const q = String(query).trim().toLowerCase();
+  // "contains" match so last digits, middle digits, anything works
+  const matches = _allChallanList.filter(id => 
+    String(id).toLowerCase().indexOf(q) !== -1
+  ).slice(0, 20);
+
+  if (matches.length === 0) {
+    // not in cache → try server search as fallback
+    box.innerHTML = '<div class="suggestion-item no-match">Searching server…</div>';
+    box.style.display = 'block';
+    if (typeof google !== 'undefined') {
+      google.script.run.withSuccessHandler(function(serverMatches){
+        // make sure user hasn't moved on
+        const stillQuery = String(_DOM.dispatchSearch.value || "").trim().toLowerCase();
+        if (stillQuery !== q) return;
+        if (!serverMatches || serverMatches.length === 0) {
+          box.innerHTML = '<div class="suggestion-item no-match">No matching Dispatch ID found</div>';
+          return;
+        }
+        // merge into cache
+        serverMatches.forEach(id => { if (_allChallanList.indexOf(id) === -1) _allChallanList.push(id); });
+        _renderSuggestions(serverMatches, q);
+      }).withFailureHandler(function(){
+        box.innerHTML = '<div class="suggestion-item no-match">No matching Dispatch ID found</div>';
+      }).searchChallanIds(query);
+    } else {
+      box.innerHTML = '<div class="suggestion-item no-match">No matching Dispatch ID found</div>';
+    }
+    return;
+  }
+
+  _renderSuggestions(matches, q);
+}
+
+function _renderSuggestions(matches, q) {
+  const box = _DOM.dispatchSugg;
+  box.innerHTML = matches.map(m => {
+    const safeAttr = _escAttr(m);
+    return `<div class="suggestion-item" onclick="pickDispatchSuggestion('${safeAttr}')">${_highlightMatch(m, q)}</div>`;
+  }).join('');
+  box.style.display = 'block';
+}
+
+function pickDispatchSuggestion(id) {
+  _DOM.dispatchSearch.value = id;
+  // sync dropdown if option exists
+  const sel = _DOM.dispatchSel;
+  let found = false;
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === id) {
+      sel.value = id;
+      found = true;
+      break;
+    }
+  }
+  if (!found) sel.value = ""; // clear dropdown so search input wins
+  _DOM.dispatchSugg.style.display = 'none';
+}
+
+function onDispatchSelectChange(value) {
+  if (value) {
+    _DOM.dispatchSearch.value = value;
+    _DOM.dispatchSugg.style.display = 'none';
+  }
+}
+
+function handleSearchKeydown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    // pick first suggestion if available, else just trigger download
+    const firstItem = _DOM.dispatchSugg.querySelector('.suggestion-item:not(.no-match)');
+    if (firstItem) {
+      firstItem.click();
+      setTimeout(createSelectedPDF, 80);
+    } else {
+      createSelectedPDF();
+    }
+  } else if (e.key === "Escape") {
+    _DOM.dispatchSugg.style.display = 'none';
+  }
+}
+
+// Hide suggestions on outside click
+document.addEventListener('click', function(e) {
+  if (!_DOM.dispatchSugg || !_DOM.dispatchSearch) return;
+  if (!_DOM.dispatchSearch.contains(e.target) && !_DOM.dispatchSugg.contains(e.target)) {
+    _DOM.dispatchSugg.style.display = 'none';
+  }
+});
+
+// ============================================================
+// SUBMIT FORM — 4-LAYER DOUBLE ENTRY PROTECTION
+// ============================================================
+function submitForm(){
+
+  if (__submitLock) {
+    showToast("⚠️ Already processing! Please wait.", true);
+    return;
+  }
+
+  const now = Date.now();
+  if (now - __lastSubmitTime < SUBMIT_DEBOUNCE_MS) {
+    showToast("⚠️ Please wait before submitting again.", true);
+    return;
+  }
+
+  if (document.body.getAttribute("data-submitting") === "true") {
+    showToast("⚠️ Submission already in progress!", true);
+    return;
+  }
+
+  const sBtn = _DOM.submitBtn;
+  if (sBtn.disabled) {
+    showToast("⚠️ Already submitted! Do not click again.", true);
+    return;
+  }
+
+  const date = _DOM.date.value;
+  const customer = _DOM.mainCustomer.value.trim();
+  const ship = _DOM.shipTo.value.trim();
+  
+  if(!date || !customer || !ship) {
+    showToast("Fill Date, Customer and Ship-To", true);
+    return;
+  }
+
+  const entries = [];
+  let valid = true;
+  let missingContractor = false;
+  let missingType = false;
+
+  const entryEls = _DOM.formContainer.querySelectorAll(".entry");
+  const entryLen = entryEls.length;
+  for (let ei = 0; ei < entryLen; ei++) {
+    const en = entryEls[ei];
+    const itemInput = en.querySelector("input[name='itemName']");
+    const itemValue = itemInput.value;
+    const descriptionValue = en.querySelector("input[name='itemDescription']").value.trim();
+    
+    const orderQty = en.querySelector("input[name='orderQty']").value || "";
+    
+    const contractorInput = en.querySelector("input[name='contractorName']");
+    const contractor = contractorInput.value.trim();
+    
+    const packer = en.querySelector("input[name='packerName']").value.trim();
+    const typeSelect = en.querySelector("select[name='packingType']");
+    const packingType = typeSelect.value;   // dropdown only — manual select
+    
+    const boraInputs = en.querySelectorAll("input[data-bora]");
+    const boras = [];
+    for (let bi = 0; bi < boraInputs.length; bi++) {
+      const v = boraInputs[bi].value;
+      if (v !== "") boras.push(v);
+    }
+
+    if(!itemValue || itemValue.trim() === "") { 
+      valid = false;
+      en.style.borderColor = "red";
+      itemInput.classList.add("error-input");
+    } else {
+      itemInput.classList.remove("error-input");
+    }
+
+    if(!contractor || contractor === "") {
+      missingContractor = true;
+      contractorInput.classList.add("error-input");
+    } else {
+      contractorInput.classList.remove("error-input");
+    }
+
+    // Type required ONLY for blocks that actually have weights entered
+    if(boras.length > 0 && !packingType) {
+      missingType = true;
+      typeSelect.classList.add("error-input");
+    } else {
+      typeSelect.classList.remove("error-input");
+    }
+
+    if(itemValue && itemValue.trim() !== "" && contractor && contractor !== "" && packingType && boras.length > 0){
+      en.style.borderColor = "#f1f5f9";
+      entries.push({
+        itemName: itemValue, 
+        itemDescription: descriptionValue, 
+        orderQty: orderQty,
+        contractorName: contractor, 
+        packerName: packer,
+        packingType: packingType, 
+        date: date, 
+        customerName: customer, 
+        shipTo: ship, 
+        boras: boras
+      });
+    }
+  }
+
+  if(!valid) { 
+    showAlert("Item Name cannot be empty."); 
+    return; 
+  }
+  if(missingContractor) { 
+    showAlert("Contractor Name is strictly required for all entries."); 
+    return; 
+  }
+  if(missingType) {
+    showAlert("Please select Type (Bora / Bale) for each item.");
+    return;
+  }
+  if(entries.length === 0) { 
+    showToast("Enter weights for at least one item", true); 
+    return; 
+  }
+
+  _lockSubmission();
+
+  const payload = {
+    entries: entries,
+    timestamp: getISTTimestamp(),
+    duration: Math.floor((Date.now() - formStartTime)/1000),
+    driverName: _DOM.driverName.value.trim(),
+    vehicleNumber: _DOM.vehicleNumber.value.trim(),
+    driverNumber: _DOM.driverNumber.value.trim(),
+    loaderName: _DOM.loaderName.value.trim(),
+    transportName: _DOM.transportName.value.trim(),
+    pdfGenTime: _DOM.pdfGenTime.value,
+    orderId: _DOM.loadOrderSel.value || "" 
+  };
+
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(resp){
+        if (resp && resp.success === false) {
+          showToast("❌ Error: " + (resp.error || "Unknown"), true);
+          _unlockSubmission();
+          return;
+        }
+        // ===== Robust filename download helper (NEW) =====
+        // Converts data: URL to a Blob URL so the browser honours the filename.
+        function _downloadWithName(dataUrl, filename) {
+          try {
+            if (!dataUrl) return;
+            const safeName = String(filename || "download.pdf").replace(/[\\/:*?\"<>|]/g, "_");
+            if (dataUrl.indexOf("data:") === 0) {
+              const parts = dataUrl.split(",");
+              const meta  = parts[0];
+              const data  = parts.slice(1).join(",");
+              const isB64 = meta.indexOf(";base64") !== -1;
+              const mime  = (meta.match(/data:([^;]+)/) || [,"application/pdf"])[1];
+              let byteStr;
+              if (isB64) byteStr = atob(data);
+              else       byteStr = decodeURIComponent(data);
+              const len = byteStr.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) bytes[i] = byteStr.charCodeAt(i);
+              const blob = new Blob([bytes], { type: mime });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = safeName;
+              a.style.display = "none";
+              document.body.appendChild(a);
+              a.click();
+              setTimeout(function(){
+                try { document.body.removeChild(a); } catch(e){}
+                try { URL.revokeObjectURL(url); } catch(e){}
+              }, 1500);
+            } else {
+              const a = document.createElement("a");
+              a.href = dataUrl;
+              a.download = safeName;
+              document.body.appendChild(a);
+              a.click();
+              setTimeout(function(){ try { document.body.removeChild(a); } catch(e){} }, 1500);
+            }
+          } catch (e) {
+            // last-resort fallback: open in new tab
+            try { window.open(dataUrl, "_blank"); } catch(e2){}
+          }
+        }
+
+        // Download single PDF (already named CustomerName_PCK-XXXX.pdf by the server)
+        _downloadWithName(resp.dataUrl, resp.filename);
+        showToast("✅ Success! PDF Downloaded.");
+        _suppressUnloadWarning = true;   // NEW: data save ho gaya, ab reload pe confirm mat maango
+        window.onbeforeunload = null;
+        setTimeout(() => location.reload(), 2500); 
+      })
+      .withFailureHandler(function(err){
+        showToast("❌ Error: " + err, true);
+        _unlockSubmission();
+      })
+      .submitFormAndCreatePDF(payload);
+  } else {
+    setTimeout(() => {
+      showToast("✅ Test Mode: Success! (No Google API detected)");
+      _suppressUnloadWarning = true;   // NEW: test mode me bhi reload-warning band
+      window.onbeforeunload = null;
+      _unlockSubmission();
+    }, 1500);
+  }
+}
+
+function createSelectedDispatchPDF(){
+  // Priority: search input value, then dropdown
+  const searchVal = _DOM.dispatchSearch.value.trim();
+  const dispatchId = searchVal || _DOM.dispatchSel.value;
+  if(!dispatchId) return showToast("Type or select a Dispatch ID", true);
+  showToast("Fetching Dispatch PDF for " + dispatchId + "...");
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(resp){
+        if (!resp || !resp.dataUrl) {
+          showToast("❌ Dispatch PDF generation failed", true);
+          return;
+        }
+        _downloadWithFilename(resp.dataUrl, resp.filename);
+        showToast("✅ Dispatch PDF Downloaded");
+      })
+      .withFailureHandler(function(err){
+        showToast("❌ " + (err.message || err), true);
+      })
+      .createChallanPDF(dispatchId);
+  }
+}
+
+// Backward-compat alias (in case any older button still references it)
+function createSelectedPDF(){ return createSelectedDispatchPDF(); }
+
+/* =====================================================================
+    PACKING REPRINT HANDLERS (NEW)
+===================================================================== */
+var _allPackingList = [];
+
+function _renderPackingSuggestions(matches, q) {
+  const box = document.getElementById("packingSuggestions");
+  if (!box) return;
+  if (!matches || !matches.length) {
+    box.innerHTML = '<div class="suggestion-item no-match">No matching Packing ID found</div>';
+    box.style.display = 'block';
+    return;
+  }
+  box.innerHTML = matches.map(m => {
+    const safeAttr = _escAttr(m);
+    return `<div class="suggestion-item" onclick="pickPackingSuggestion(\'${safeAttr}\')">${_highlightMatch(m, q)}</div>`;
+  }).join('');
+  box.style.display = 'block';
+}
+
+function pickPackingSuggestion(id) {
+  const input = document.getElementById("packingSearchInput");
+  if (input) input.value = id;
+  const sel = document.getElementById("packingSelect");
+  if (sel) {
+    // make sure option exists
+    let found = false;
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === id) { sel.selectedIndex = i; found = true; break; }
+    }
+    if (!found) {
+      const opt = document.createElement("option");
+      opt.value = id; opt.textContent = id;
+      sel.appendChild(opt);
+      sel.value = id;
+    }
+  }
+  const box = document.getElementById("packingSuggestions");
+  if (box) box.style.display = 'none';
+}
+
+function onPackingSelectChange(val) {
+  const input = document.getElementById("packingSearchInput");
+  if (input) input.value = val || "";
+}
+
+function handlePackingSearchKeydown(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    createSelectedPackingPDF();
+  }
+}
+
+function filterPackingSuggestions(value) {
+  const box = document.getElementById("packingSuggestions");
+  if (!box) return;
+  const q = String(value || "").toLowerCase().trim();
+  if (!q) {
+    // show recent
+    if (_allPackingList.length) {
+      _renderPackingSuggestions(_allPackingList.slice(0, 25), "");
+    } else {
+      box.style.display = 'none';
+    }
+    return;
+  }
+  const local = _allPackingList.filter(id => String(id).toLowerCase().indexOf(q) !== -1);
+  if (local.length) {
+    _renderPackingSuggestions(local.slice(0, 25), q);
+    return;
+  }
+  // server search
+  if (typeof google !== "undefined") {
+    google.script.run.withSuccessHandler(function(serverMatches){
+      if (!serverMatches || !serverMatches.length) {
+        box.innerHTML = '<div class="suggestion-item no-match">No matching Packing ID found</div>';
+        box.style.display = 'block';
+        return;
+      }
+      serverMatches.forEach(id => { if (_allPackingList.indexOf(id) === -1) _allPackingList.push(id); });
+      _renderPackingSuggestions(serverMatches, q);
+    }).withFailureHandler(function(){
+      box.innerHTML = '<div class="suggestion-item no-match">No matching Packing ID found</div>';
+      box.style.display = 'block';
+    }).searchPackingIds(value);
+  } else {
+    box.innerHTML = '<div class="suggestion-item no-match">No matching Packing ID found</div>';
+    box.style.display = 'block';
+  }
+}
+
+function createSelectedPackingPDF(){
+  const input = document.getElementById("packingSearchInput");
+  const sel = document.getElementById("packingSelect");
+  const searchVal = (input && input.value || "").trim();
+  const packingId = searchVal || (sel && sel.value) || "";
+  if(!packingId) return showToast("Type or select a Packing ID", true);
+  showToast("Fetching Packing PDF for " + packingId + "...");
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(function(resp){
+        if (!resp || !resp.dataUrl) {
+          showToast("❌ Packing PDF generation failed", true);
+          return;
+        }
+        _downloadWithFilename(resp.dataUrl, resp.filename);
+        showToast("✅ Packing PDF Downloaded");
+      })
+      .withFailureHandler(function(err){
+        showToast("❌ " + (err.message || err), true);
+      })
+      .createPackingPDF(packingId);
+  }
+}
+
+function showToast(msg, isError){
+  const t = _DOM.toast;
+  t.textContent = msg;
+  t.style.borderLeft = isError ? "5px solid #ef4444" : "5px solid #22c55e";
+  t.className = "show";
+  setTimeout(() => t.className = "", 3000);
+}
+
+
+// ===== Global download helper (NEW) =====
+function _downloadWithFilename(dataUrl, filename) {
+  try {
+    if (!dataUrl) return;
+    const safeName = String(filename || "download.pdf").replace(/[\\/:*?\"<>|]/g, "_");
+    if (dataUrl.indexOf("data:") === 0) {
+      const parts = dataUrl.split(",");
+      const meta  = parts[0];
+      const data  = parts.slice(1).join(",");
+      const isB64 = meta.indexOf(";base64") !== -1;
+      const mime  = (meta.match(/data:([^;]+)/) || [,"application/pdf"])[1];
+      let byteStr;
+      if (isB64) byteStr = atob(data);
+      else       byteStr = decodeURIComponent(data);
+      const len = byteStr.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) bytes[i] = byteStr.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = safeName; a.style.display = "none";
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ try { document.body.removeChild(a); } catch(e){} try { URL.revokeObjectURL(url); } catch(e){} }, 1500);
+    } else {
+      const a = document.createElement("a");
+      a.href = dataUrl; a.download = safeName;
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ try { document.body.removeChild(a); } catch(e){} }, 1500);
+    }
+  } catch (e) { try { window.open(dataUrl, "_blank"); } catch(e2){} }
+}
+
+// ============================================================
+// REFRESH / CLOSE GUARD (NEW)
+// Agar form me koi data bhara hai aur user refresh/close kare,
+// to browser pehle confirm maangega. Khaali form pe kuch nahi puchhega.
+// Successful submit ke baad warning suppress ho jaati hai.
+// (Yahan kuch delete/remove nahi hota — sirf confirm.)
+// ============================================================
+function _formHasData() {
+  try {
+    // 1) Koi bhi weight (bora/bale/box) bhara hai?
+    const boraInputs = document.querySelectorAll("input[data-bora]");
+    for (let i = 0; i < boraInputs.length; i++) {
+      if (boraInputs[i].value && String(boraInputs[i].value).trim() !== "") return true;
+    }
+    // 2) Header fields
+    if (_DOM.mainCustomer && _DOM.mainCustomer.value.trim()) return true;
+    if (_DOM.shipTo && _DOM.shipTo.value.trim()) return true;
+    if (_DOM.driverName && _DOM.driverName.value.trim()) return true;
+    if (_DOM.vehicleNumber && _DOM.vehicleNumber.value.trim()) return true;
+    if (_DOM.driverNumber && _DOM.driverNumber.value.trim()) return true;
+    if (_DOM.loaderName && _DOM.loaderName.value.trim()) return true;
+    if (_DOM.transportName && _DOM.transportName.value.trim()) return true;
+    // 3) Item name ya Contractor bhara hai?
+    const itemInputs = document.querySelectorAll("input[name='itemName']");
+    for (let i = 0; i < itemInputs.length; i++) {
+      if (itemInputs[i].value && String(itemInputs[i].value).trim() !== "") return true;
+    }
+    const contrInputs = document.querySelectorAll("input[name='contractorName']");
+    for (let i = 0; i < contrInputs.length; i++) {
+      if (contrInputs[i].value && String(contrInputs[i].value).trim() !== "") return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+window.addEventListener("beforeunload", function(e) {
+  // Success ke baad intentional reload -> warning mat dikhao
+  if (_suppressUnloadWarning) return;
+  // Submission chal raha hai YA form me data hai -> browser confirm maange
+  if (__submitLock || _formHasData()) {
+    e.preventDefault();
+    e.returnValue = "";   // browser apna default "Leave site?" confirm dikhayega
+    return "";
+  }
+});
+
+window.onload = function() {
+  _cacheDom();
+  _DOM.pdfGenTime.value = getISTTimeOnly();
+  initForm();
+
+  const sBtn = _DOM.submitBtn;
+  let __tapLock = false;
+
+  function _handleSubmitEvent(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    if (__tapLock || __submitLock) return;
+
+    __tapLock = true;
+
+    requestAnimationFrame(function() {
+      submitForm();
+      setTimeout(function() { __tapLock = false; }, 5000);
+    });
+  }
+
+  sBtn.addEventListener('touchstart', _handleSubmitEvent, { passive: false, capture: true });
+  sBtn.addEventListener('click',      _handleSubmitEvent, { capture: true });
+};
+</script>
+</body>
+</html>
